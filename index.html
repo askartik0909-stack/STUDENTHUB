@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система управления практикой | StudentHub</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary: #80182a;
+            --primary-hover: #a3263a;
+            --bg: #ffffff;
+            --light-bg: #fdf2f4;
+            --text: #333333;
+            --gray: #636e72;
+            --disabled: #dfe6e9;
+            --white: #ffffff;
+            --shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
+        body { margin: 0; background: var(--bg); color: var(--text); }
+
+        .wrapper { display: flex; height: 100vh; overflow: hidden; }
+
+        /* Сайдбар */
+        .sidebar { 
+            width: 280px; background: var(--primary); color: white;
+            display: none; flex-direction: column; padding: 30px 20px; 
+        }
+        .sidebar .logo { font-size: 24px; font-weight: 800; margin-bottom: 50px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 20px; }
+        
+        .nav-item { 
+            padding: 15px 20px; margin-bottom: 10px; border-radius: 10px; 
+            cursor: pointer; transition: all 0.3s; color: rgba(255,255,255,0.8);
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: var(--white); color: var(--primary); font-weight: bold; }
+
+        /* Контент */
+        .content { flex: 1; padding: 40px; overflow-y: auto; display: none; }
+        h1 { color: var(--primary); font-size: 28px; margin-bottom: 30px; }
+
+        /* Карточки и Элементы */
+        .card { background: white; padding: 30px; border-radius: 15px; border: 1px solid #eee; margin-bottom: 25px; box-shadow: var(--shadow); position: relative; }
+        .card.closed { background: var(--disabled); opacity: 0.8; border-color: #ccc; }
+        .card.closed .btn { display: none; }
+        .status-badge { position: absolute; top: 20px; right: 20px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+
+        /* Кнопки */
+        .btn { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; transition: 0.3s; font-weight: 600; width: 100%; }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-gray { background: #636e72; }
+
+        /* Формы */
+        input, select, textarea { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .tag { display: inline-block; padding: 4px 12px; border-radius: 15px; background: var(--light-bg); color: var(--primary); font-size: 12px; margin-right: 5px; font-weight: 600; }
+
+        /* Фильтры */
+        .filter-bar { display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; align-items: center; }
+        .filter-btn { padding: 8px 18px; border-radius: 20px; border: 1px solid var(--primary); cursor: pointer; color: var(--primary); background: white; font-size: 14px; }
+        .filter-btn.active { background: var(--primary); color: white; }
+
+        /* Специфические блоки */
+        #map { height: 500px; width: 100%; border-radius: 15px; }
+        .chat-box { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px; background: #fafafa; }
+        
+        /* Google Button Style */
+        .divider { margin: 20px 0; display: flex; align-items: center; text-align: center; color: #999; font-size: 12px; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #eee; }
+        .divider:not(:empty)::before { margin-right: .5em; }
+        .divider:not(:empty)::after { margin-left: .5em; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div id="page-login" style="display: flex; width: 100%; height: 100vh; justify-content: center; align-items: center; background: var(--primary);">
+        <div style="background: white; padding: 40px; border-radius: 20px; width: 400px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+            <h2 style="color: var(--primary); margin-bottom: 30px;">StudentHub Login</h2>
+            
+            <div id="g_id_onload"
+                 data-client_id="483400890366-mivm8vmn9s9sqm7v8g8v8g8v8g8v8g8v.apps.googleusercontent.com" 
+                 data-callback="handleCredentialResponse">
+            </div>
+            <div class="g_id_signin" data-type="standard" data-width="320"></div>
+
+            <div class="divider">или войти через почту</div>
+
+            <input type="text" id="user" placeholder="Логин">
+            <input type="password" id="pass" placeholder="Пароль">
+            <button class="btn" onclick="login()">Войти в систему</button>
+            <p style="margin-top: 20px; color: #999; font-size: 12px;">Тестовый доступ: admin / 123</p>
+        </div>
+    </div>
+
+    <nav class="sidebar" id="sidebar">
+        <div class="logo">STUDENT HUB</div>
+        <div class="nav-item active" onclick="showPage('page-dash')">Главный экран</div>
+        <div class="nav-item" onclick="showPage('page-profile')">Редактировать резюме</div>
+        <div class="nav-item" onclick="showPage('page-catalog')">Места практики</div>
+        <div class="nav-item" onclick="showPage('page-map')">Карта поиска</div>
+        <div class="nav-item" onclick="showPage('page-add')">Добавить место</div>
+        <div class="nav-item" onclick="showPage('page-ai')">ИИ Консультант</div>
+        <div class="nav-item" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1);" onclick="location.reload()">Выйти</div>
+    </nav>
+
+    <div id="page-dash" class="content">
+        <h1>Обзор системы</h1>
+        <p>Добро пожаловать в центральную панель управления поиском практики.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <div class="card"><h3>12</h3><p>Открытых позиций IT</p></div>
+            <div class="card"><h3>5</h3><p>Мест в дизайне</p></div>
+            <div class="card"><h3>8</h3><p>Маркетинг</p></div>
+        </div>
+    </div>
+
+    <div id="page-profile" class="content">
+        <h1>👤 Редактирование профиля</h1>
+        <div class="card">
+            <label>ФИО Студента</label>
+            <input type="text" id="resume-name" value="Александр Студентов">
+            <label>О себе / Навыки</label>
+            <textarea id="resume-about" rows="5" placeholder="Python, SQL, UI/UX..."></textarea>
+            <button class="btn" onclick="alert('Резюме сохранено!')">Сохранить</button>
+        </div>
+    </div>
+
+    <div id="page-catalog" class="content">
+        <h1>🏢 Места практики</h1>
+        <div id="catalog-list"></div>
+    </div>
+
+    <div id="page-add" class="content">
+        <h1>➕ Добавить вакансию</h1>
+        <div class="card">
+            <label>Название компании</label>
+            <input type="text" id="new-comp-name">
+            <label>Описание</label>
+            <textarea id="new-comp-desc" rows="3"></textarea>
+            <button class="btn" onclick="addNewPlace()">Опубликовать</button>
+        </div>
+    </div>
+
+    <div id="page-map" class="content">
+        <h1>📍 Карта Алматы</h1>
+        <div class="card"><div id="map"></div></div>
+    </div>
+
+    <div id="page-ai" class="content">
+        <h1>🤖 ИИ Консультант</h1>
+        <div class="card">
+            <div class="chat-box" id="ai-chat"></div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <input type="text" id="ai-msg" style="margin:0" placeholder="Ваш вопрос...">
+                <button class="btn" style="width: auto;" onclick="askAI()">Отправить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let places = [
+        { id: 1, name: "IT TechSoft", spec: "IT", desc: "Разработка на JS/React", status: "open", tags: ["Web", "Junior"] },
+        { id: 2, name: "Creative Studio", spec: "Design", desc: "Создание логотипов", status: "open", tags: ["Figma", "UI"] }
+    ];
+
+    function handleCredentialResponse(response) {
+        try {
+            const responsePayload = parseJwt(response.credential);
+            document.getElementById('resume-name').value = responsePayload.name;
+            enterSystem();
+        } catch (e) {
+            console.error("Ошибка авторизации", e);
+        }
+    }
+
+    function parseJwt (token) {
+        var base64Url = token.split('.')[1];
+        var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        return JSON.parse(window.atob(base64));
+    }
+
+    function login() {
+        if(document.getElementById('user').value === 'admin') enterSystem();
+        else alert("Неверный логин");
+    }
+
+    function enterSystem() {
+        document.getElementById('page-login').style.display = 'none';
+        document.getElementById('sidebar').style.display = 'flex';
+        showPage('page-dash');
+        renderCatalog();
+    }
+
+    function showPage(id) {
+        document.querySelectorAll('.content').forEach(p => p.style.display = 'none');
+        document.getElementById(id).style.display = 'block';
+        if(id === 'page-map') setTimeout(initMap, 200);
+    }
+
+    function renderCatalog() {
+        const list = document.getElementById('catalog-list');
+        list.innerHTML = '';
+        places.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `<h2>${p.name}</h2><p>${p.desc}</p>`;
+            list.appendChild(card);
+        });
+    }
+
+    let map;
+    function initMap() {
+        if(map) return;
+        map = L.map('map').setView([43.2389, 76.8897], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    }
+
+    function askAI() {
+        const msg = document.getElementById('ai-msg').value;
+        if(!msg) return;
+        const chat = document.getElementById('ai-chat');
+        chat.innerHTML += `<div><b>Вы:</b> ${msg}</div>`;
+        document.getElementById('ai-msg').value = '';
+    }
+</script>
+</body>
+</html>
